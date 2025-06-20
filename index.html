@@ -40,6 +40,19 @@
             padding: 8px;
             width: 20%;
         }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: red;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+        .item-text {
+            cursor: pointer;
+        }
+        .item-text:hover {
+            background-color: #f5f5f5;
+        }
     </style>
 </head>
 <body>
@@ -49,7 +62,7 @@
 <table id="todoList">
     <thead>
         <tr>
-            <th>Number</th>
+            <th>ID</th>
             <th>Text</th>
             <th>Action</th>
         </tr>
@@ -65,38 +78,116 @@
 </div>
 
 <script>
-    let items = [];
-    let nextId = 1;
-
-    function renderList() {
-        const listBody = document.getElementById('listBody');
-        listBody.innerHTML = '';
-
-        items.forEach((item, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${item.text}</td>
-                <td><button onclick="removeItem(${index})">Remove</button></td>
-            `;
-            listBody.appendChild(row);
-        });
+    async function loadItems() {
+        try {
+            const response = await fetch('/');
+            const html = await response.text();
+            document.body.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading items:', error);
+        }
     }
 
-    function addItem() {
+    async function addItem() {
         const newItemInput = document.getElementById('newItem');
         const newItemText = newItemInput.value.trim();
 
         if (newItemText) {
-            items.push({ id: nextId++, text: newItemText });
-            newItemInput.value = '';
-            renderList();
+            try {
+                const response = await fetch('/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: newItemText }),
+                });
+
+                if (response.ok) {
+                    newItemInput.value = '';
+                    await loadItems();
+                } else {
+                    console.error('Failed to add item');
+                }
+            } catch (error) {
+                console.error('Error adding item:', error);
+            }
         }
     }
 
-    function removeItem(index) {
-        items.splice(index, 1);
-        renderList();
+    async function removeItem(id) {
+        if (confirm('Are you sure you want to delete this item?')) {
+            try {
+                const response = await fetch('/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id: id }),
+                });
+
+                if (response.ok) {
+                    await loadItems();
+                } else {
+                    console.error('Failed to delete item');
+                }
+            } catch (error) {
+                console.error('Error deleting item:', error);
+            }
+        }
+    }
+
+    function startEditing(id) {
+        const textSpan = document.getElementById(`text-${id}`);
+        const editInput = document.getElementById(`edit-${id}`);
+        
+        textSpan.style.display = 'none';
+        editInput.style.display = 'inline';
+        editInput.focus();
+    }
+
+    async function finishEditing(id) {
+        const textSpan = document.getElementById(`text-${id}`);
+        const editInput = document.getElementById(`edit-${id}`);
+        const newText = editInput.value.trim();
+
+        if (newText && newText !== textSpan.textContent) {
+            try {
+                const response = await fetch('/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id: id, text: newText }),
+                });
+
+                if (response.ok) {
+                    await loadItems();
+                } else {
+                    console.error('Failed to update item');
+                    textSpan.style.display = 'inline';
+                    editInput.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error updating item:', error);
+                textSpan.style.display = 'inline';
+                editInput.style.display = 'none';
+            }
+        } else {
+            textSpan.style.display = 'inline';
+            editInput.style.display = 'none';
+        }
+    }
+
+    function handleEditKeyPress(event, id) {
+        if (event.key === 'Enter') {
+            finishEditing(id);
+        } else if (event.key === 'Escape') {
+            const textSpan = document.getElementById(`text-${id}`);
+            const editInput = document.getElementById(`edit-${id}`);
+            
+            textSpan.style.display = 'inline';
+            editInput.style.display = 'none';
+        }
     }
 </script>
 
